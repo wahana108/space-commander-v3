@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CCL Space Commander — Protocol v3.0</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#040913;--panel:#06101e;--border:#0d3a5c;
+  --atk:#EF5350;--evd:#42A5F5;--def:#66BB6A;
+  --accent:#8ED6FF;--warn:#FFD54F;--purple:#CE93D8;
+  --danger:#ff2244;--green:#00ff88;
+  --text:#cce4f7;--dim:#3a6080;
+  --mono:'Share Tech Mono',monospace;--display:'Orbitron',sans-serif;
+}
+html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-family:var(--mono);overflow:hidden}
+
+/* ===== TITLE SCREEN ===== */
+#titleScreen{position:fixed;inset:0;background:var(--bg);z-index:500;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px}
+#titleScreen.hidden{display:none}
+#titleCanvas{position:absolute;inset:0;pointer-events:none}
+.t-logo{font-family:var(--display);font-size:clamp(24px,5vw,52px);font-weight:900;color:var(--accent);letter-spacing:6px;position:relative;animation:tpulse 2s ease-in-out infinite;text-shadow:0 0 30px rgba(142,214,255,0.4)}
+.t-sub{font-family:var(--display);font-size:11px;color:var(--dim);letter-spacing:8px;margin:8px 0 28px;position:relative}
+.t-role{font-size:12px;color:var(--warn);letter-spacing:3px;margin-bottom:14px;position:relative}
+.t-desc{font-size:11px;color:var(--text);line-height:2.2;margin-bottom:32px;position:relative;max-width:520px;opacity:0.8}
+.t-btn{font-family:var(--display);font-size:13px;font-weight:700;letter-spacing:4px;padding:14px 52px;border:1px solid var(--accent);background:transparent;color:var(--accent);cursor:pointer;border-radius:4px;position:relative;transition:all 0.2s;animation:tblink 1.5s ease-in-out infinite}
+.t-btn:hover{background:rgba(142,214,255,0.08);box-shadow:0 0 20px rgba(142,214,255,0.2)}
+.t-legend{margin-top:26px;font-size:9px;color:var(--dim);letter-spacing:2px;line-height:3;position:relative}
+@keyframes tpulse{0%,100%{opacity:1}50%{opacity:0.7}}
+@keyframes tblink{0%,100%{box-shadow:0 0 8px rgba(142,214,255,0.3)}50%{box-shadow:none}}
+
+/* ===== MAIN LAYOUT ===== */
+#wrapper{width:100%;height:100%;display:flex;flex-direction:column;position:relative}
+
+/* ===== TOP HUD ===== */
+#topbar{
+  background:rgba(6,16,30,0.95);border-bottom:1px solid var(--border);
+  padding:8px 16px;display:flex;justify-content:space-between;align-items:center;
+  flex-shrink:0;flex-wrap:wrap;gap:8px;z-index:10;
+}
+.hud-title{font-family:var(--display);font-size:12px;font-weight:700;color:var(--accent);letter-spacing:3px}
+.hud-sub{font-size:8px;color:var(--dim);letter-spacing:2px;margin-top:2px}
+.hud-stats{display:flex;gap:18px;font-size:10px;color:var(--dim)}
+.hud-stats span{color:var(--text);font-weight:700;font-family:var(--display)}
+.hud-wave{font-family:var(--display);font-size:11px;color:var(--warn);letter-spacing:3px}
+
+/* ===== CANVAS ===== */
+#gameWrap{flex:1;position:relative;overflow:hidden;min-height:0}
+#game{display:block;width:100%;height:100%}
+
+/* Boss HUD */
+#boss-hud{position:absolute;top:8px;left:50%;transform:translateX(-50%);display:none;min-width:200px;
+  font-family:var(--display);font-size:9px;letter-spacing:2px;color:var(--danger);text-align:center;
+  background:rgba(4,9,19,0.8);padding:4px 14px;border:1px solid var(--danger);border-radius:3px}
+#boss-hud.show{display:block}
+#boss-bar-bg{width:100%;height:5px;background:rgba(255,34,68,0.15);border-radius:2px;margin-top:3px;overflow:hidden}
+#boss-bar{height:100%;background:var(--danger);transition:width 0.3s}
+
+/* Reward / Overdrive banner */
+#reward-banner{position:absolute;top:8px;right:8px;font-family:var(--display);font-size:8px;letter-spacing:2px;
+  padding:3px 10px;border-radius:3px;display:none;animation:rblink 0.6s ease-in-out infinite alternate}
+#reward-banner.show{display:block}
+#reward-banner.ratk{border:1px solid var(--atk);color:var(--atk);background:rgba(239,83,80,0.1)}
+#reward-banner.revd{border:1px solid var(--evd);color:var(--evd);background:rgba(66,165,245,0.1)}
+#reward-banner.rdef{border:1px solid var(--def);color:var(--def);background:rgba(102,187,106,0.1)}
+@keyframes rblink{from{opacity:1}to{opacity:0.4}}
+
+/* ===== BOTTOM PANEL ===== */
+#bottomPanel{
+  background:rgba(6,16,30,0.96);border-top:1px solid var(--border);
+  padding:10px 14px;flex-shrink:0;z-index:20;
+  transition:opacity 0.3s,visibility 0.3s;
+}
+#bottomPanel.dim{opacity:0.25}
+#bottomPanel.dim:hover{opacity:1}
+
+/* Resource cards */
+#resourceRow{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px}
+.card{background:rgba(255,255,255,0.04);border-radius:6px;padding:8px 10px;border:1px solid rgba(255,255,255,0.08);position:relative;overflow:hidden}
+.card h3{font-family:var(--display);font-size:7px;letter-spacing:2px;margin-bottom:4px;opacity:0.6}
+.card .val{font-family:var(--display);font-size:22px;font-weight:700;line-height:1}
+.card .bar{margin-top:5px;height:4px;background:rgba(255,255,255,0.07);border-radius:2px;overflow:hidden}
+.card .fill{height:100%;border-radius:2px;transition:width 0.2s}
+.card.c-atk{border-color:rgba(239,83,80,0.4)}.card.c-atk .val{color:var(--atk)}.card.c-atk .fill{background:var(--atk)}
+.card.c-evd{border-color:rgba(66,165,245,0.4)}.card.c-evd .val{color:var(--evd)}.card.c-evd .fill{background:var(--evd)}
+.card.c-def{border-color:rgba(102,187,106,0.4)}.card.c-def .val{color:var(--def)}.card.c-def .fill{background:var(--def)}
+.card.c-hp{border-color:rgba(255,213,79,0.4)}.card.c-hp .val{color:var(--warn)}.card.c-hp .fill{background:var(--warn)}
+.card.warn-pulse{animation:cpwarn 0.6s ease-in-out infinite alternate}
+@keyframes cpwarn{from{background:rgba(255,255,255,0.04)}to{background:rgba(255,34,68,0.1)}}
+.card .od-label{position:absolute;top:4px;right:6px;font-family:var(--display);font-size:7px;letter-spacing:1px;padding:1px 5px;border-radius:2px}
+
+/* Command buttons */
+#commandPanel{display:flex;gap:10px;align-items:stretch}
+#commandButtons{display:flex;flex-direction:column;gap:6px;flex-shrink:0;width:160px}
+.cmdBtn{
+  font-family:var(--display);font-size:9px;font-weight:700;letter-spacing:2px;
+  padding:9px 8px;border-radius:4px;border:1px solid rgba(255,255,255,0.1);
+  background:rgba(255,255,255,0.04);color:rgba(255,255,255,0.5);
+  cursor:pointer;transition:all 0.15s;text-align:left;line-height:1.4
+}
+.cmdBtn .csub{display:block;font-size:6px;opacity:0.4;font-weight:400;margin-top:2px;letter-spacing:1px}
+.cmdBtn.activeAtk{border-color:var(--atk);color:var(--atk);background:rgba(239,83,80,0.1);box-shadow:0 0 8px rgba(239,83,80,0.15)}
+.cmdBtn.activeEvd{border-color:var(--evd);color:var(--evd);background:rgba(66,165,245,0.1);box-shadow:0 0 8px rgba(66,165,245,0.15)}
+.cmdBtn.activeDef{border-color:var(--def);color:var(--def);background:rgba(102,187,106,0.1);box-shadow:0 0 8px rgba(102,187,106,0.15)}
+.cmdBtn:hover:not(.activeAtk):not(.activeEvd):not(.activeDef){border-color:rgba(255,255,255,0.25);color:var(--text)}
+
+/* Question box */
+#questionBox{flex:1;background:rgba(0,0,0,0.2);border-radius:6px;padding:12px;border:1px solid var(--border)}
+#qHeader{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+#authTitle{font-family:var(--display);font-size:8px;letter-spacing:3px;opacity:0.6}
+#qlvl{font-family:var(--display);font-size:7px;padding:2px 7px;border-radius:2px;letter-spacing:2px}
+#qlvl.easy{background:rgba(0,255,136,0.12);color:var(--green);border:1px solid var(--green)}
+#qlvl.normal{background:rgba(255,213,79,0.12);color:var(--warn);border:1px solid var(--warn)}
+#qlvl.hard{background:rgba(206,147,216,0.12);color:var(--purple);border:1px solid var(--purple)}
+#questionText{font-size:13px;color:var(--text);margin-bottom:10px;min-height:32px;line-height:1.6}
+#answers{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-bottom:8px}
+.ansBtn{font-family:var(--mono);font-size:11px;padding:8px 10px;border-radius:4px;border:1px solid var(--border);
+  background:transparent;color:var(--text);cursor:pointer;transition:all 0.1s;text-align:left}
+.ansBtn:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+.ansBtn.ok{border-color:var(--green)!important;color:var(--green)!important;background:rgba(0,255,136,0.06)}
+.ansBtn.no{border-color:var(--danger)!important;color:var(--danger)!important;background:rgba(255,34,68,0.06)}
+.ansBtn:disabled{opacity:0.55;cursor:default}
+#countdown-wrap{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+#countdown-bg{flex:1;height:3px;background:rgba(255,255,255,0.08);border-radius:2px;overflow:hidden}
+#countdown-bar{height:100%;border-radius:2px;transition:width 0.9s linear}
+#countdown-txt{font-family:var(--display);font-size:10px;min-width:24px;text-align:right;color:var(--warn)}
+#feedback{font-family:var(--display);font-size:9px;letter-spacing:2px;min-height:14px}
+#log{font-size:9px;color:var(--dim);margin-top:5px;letter-spacing:1px;height:12px;overflow:hidden}
+
+/* ===== GAME OVER ===== */
+#gameover{display:none;position:fixed;inset:0;background:rgba(4,9,19,0.97);z-index:200;
+  flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;padding:20px}
+#gameover.show{display:flex}
+#go-title{font-family:var(--display);font-size:clamp(20px,4vw,38px);color:var(--danger);letter-spacing:6px;animation:goflick 1s infinite}
+@keyframes goflick{0%,100%{opacity:1}50%{opacity:0.5}}
+.go-grade{font-family:var(--display);font-size:clamp(52px,12vw,80px);font-weight:900;line-height:1}
+.gS{color:#00ff88}.gA{color:#FFD54F}.gB{color:#8ED6FF}.gC{color:#ff6b00}.gD{color:#ff2244}
+#go-stats{font-size:11px;line-height:2.4;color:var(--text)}
+#go-stats b{color:var(--accent);font-weight:400}
+.go-btns{display:flex;gap:12px;margin-top:10px}
+.gobtn{font-family:var(--display);font-size:10px;letter-spacing:3px;padding:10px 28px;border-radius:4px;cursor:pointer;transition:all 0.15s}
+.gobtn.pri{border:1px solid var(--accent);background:transparent;color:var(--accent)}.gobtn.pri:hover{background:rgba(142,214,255,0.08)}
+.gobtn.sec{border:1px solid var(--dim);background:transparent;color:var(--dim)}.gobtn.sec:hover{border-color:var(--text);color:var(--text)}
+
+@media(max-width:700px){
+  #resourceRow{grid-template-columns:repeat(2,1fr)}
+  #commandPanel{flex-direction:column}
+  #commandButtons{width:100%;flex-direction:row}
+  .cmdBtn{flex:1;text-align:center}
+  #answers{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- ===== TITLE SCREEN ===== -->
+<div id="titleScreen">
+  <canvas id="titleCanvas"></canvas>
+  <div class="t-logo">◈ CCL SPACE COMMANDER</div>
+  <div class="t-sub">COGNITIVE COMMAND LAYER — PROTOCOL v3.0</div>
+  <div class="t-role">▸ ANDA ADALAH COMMANDER, BUKAN PILOT ◂</div>
+  <div class="t-desc">
+    Kapal AI bertempur otomatis.<br>
+    Tugas Anda: otorisasi command melalui Tactical Verification System.<br>
+    Jawab pertanyaan → pool terisi → AI semakin kuat.<br>
+    Pool habis → AI kehilangan kemampuan satu per satu.
+  </div>
+  <button class="t-btn" id="startBtn">▶ MULAI MISI</button>
+  <div class="t-legend">
+    <span style="color:var(--atk)">⚡ ATTACK</span> · Tembakan laser otomatis &nbsp;|&nbsp;
+    <span style="color:var(--evd)">◎ EVADE</span> · Hindari proyektil musuh &nbsp;|&nbsp;
+    <span style="color:var(--def)">⬡ DEFENSE</span> · Serap damage masuk<br>
+    EASY <span style="color:var(--green)">+1</span> &nbsp;|&nbsp; NORMAL <span style="color:var(--warn)">+2</span> &nbsp;|&nbsp; HARD <span style="color:var(--purple)">+5</span> &nbsp;&nbsp;·&nbsp;&nbsp; Pool penuh → MODE OVERDRIVE aktif!
+  </div>
+</div>
+
+<!-- ===== MAIN GAME ===== -->
+<div id="wrapper">
+
+  <div id="topbar">
+    <div>
+      <div class="hud-title">◈ CCL SPACE COMMANDER</div>
+      <div class="hud-sub">COGNITIVE COMMAND LAYER — TACTICAL AI ACTIVE</div>
+    </div>
+    <div class="hud-stats">
+      WAVE: <span id="vWave">01</span> &nbsp;|&nbsp;
+      SCORE: <span id="vScore">0</span> &nbsp;|&nbsp;
+      TIME: <span id="vTime">00:00</span> &nbsp;|&nbsp;
+      COMBO: <span id="vCombo">×1</span>
+    </div>
+    <div class="hud-wave" id="waveLabel">WAVE 01</div>
+  </div>
+
+  <div id="gameWrap">
+    <canvas id="game"></canvas>
+    <div id="boss-hud"><span id="boss-name">ANOMALI</span>
+      <div id="boss-bar-bg"><div id="boss-bar" style="width:100%"></div></div>
+    </div>
+    <div id="reward-banner"></div>
+  </div>
+
+  <div id="bottomPanel" id="bottomPanel">
+
+    <div id="resourceRow">
+      <div class="card c-atk" id="card-atk">
+        <h3>ATTACK AUTHORIZATION</h3>
+        <div class="val" id="vAtk">5</div>
+        <div class="bar"><div class="fill" id="fillAtk" style="width:25%"></div></div>
+      </div>
+      <div class="card c-evd" id="card-evd">
+        <h3>EVADE AUTHORIZATION</h3>
+        <div class="val" id="vEvd">5</div>
+        <div class="bar"><div class="fill" id="fillEvd" style="width:25%"></div></div>
+      </div>
+      <div class="card c-def" id="card-def">
+        <h3>DEFENSE AUTHORIZATION</h3>
+        <div class="val" id="vDef">5</div>
+        <div class="bar"><div class="fill" id="fillDef" style="width:25%"></div></div>
+      </div>
+      <div class="card c-hp" id="card-hp">
+        <h3>SHIP INTEGRITY</h3>
+        <div class="val" id="vHp">10</div>
+        <div class="bar"><div class="fill" id="fillHp" style="width:100%"></div></div>
+      </div>
+    </div>
+
+    <div id="commandPanel">
+      <div id="commandButtons">
+        <button class="cmdBtn activeAtk" id="btnAtk">
+          ⚡ ATTACK CMD
+          <span class="csub" id="badgeAtk">FIREPOWER · EASY +1</span>
+        </button>
+        <button class="cmdBtn" id="btnEvd">
+          ◎ EVADE CMD
+          <span class="csub" id="badgeEvd">EVASION · EASY +1</span>
+        </button>
+        <button class="cmdBtn" id="btnDef">
+          ⬡ DEFENSE CMD
+          <span class="csub" id="badgeDef">BARRIER · EASY +1</span>
+        </button>
+      </div>
+
+      <div id="questionBox">
+        <div id="qHeader">
+          <div id="authTitle">TACTICAL AUTHORIZATION REQUIRED</div>
+          <div id="qlvl" class="easy">EASY +1</div>
+        </div>
+        <div id="questionText">—</div>
+        <div id="answers"></div>
+        <div id="countdown-wrap">
+          <div id="countdown-bg"><div id="countdown-bar" style="width:100%;background:var(--green)"></div></div>
+          <div id="countdown-txt">12</div>
+        </div>
+        <div id="feedback"></div>
+        <div id="log">[ CCL PROTOCOL ACTIVE ]</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===== GAME OVER ===== -->
+<div id="gameover">
+  <div id="go-title">MISSION FAILED</div>
+  <div class="go-grade" id="go-grade">B</div>
+  <div id="go-stats"></div>
+  <div class="go-btns">
+    <button class="gobtn pri" id="btnRestart">⟳ ULANGI MISI</button>
+    <button class="gobtn sec" id="btnMenu">◈ MAIN MENU</button>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// QUESTION BANK (LOADED FROM EXTERNAL JSON)
+// ============================================================
+let QB = [];
+
+async function fetchQuestions() {
+  try {
+    const response = await fetch('questions.json');
+    if (!response.ok) throw new Error('Failed to load questions');
+    QB = await response.json();
+    console.log('Database soal terunduh:', QB.length);
+    $('startBtn').disabled = false;
+    $('startBtn').textContent = '▶ MULAI MISI';
+  } catch (err) {
+    console.error(err);
+    $('log').textContent = 'ERR: GAGAL MEMUAT DATABASE SOAL';
+    $('startBtn').textContent = '⚠ DATABASE ERROR';
+  }
+}
+
+// Inisialisasi pengambilan data saat window load
+window.addEventListener('load', fetchQuestions);
+
+// ============================================================
+// STATE
+// ============================================================
+const MAX = 20;
+let AP=5, EP=5, DP=5, hp=10;
+const maxHp=10;
+let score=0, wave=1, elapsed=0, fc=0;
+let correctCnt=0, total=0, combo=1, maxCombo=1;
+let running=false;
+let currentMode='atk';
+
+// Overdrive flags
+let atkOD=false,atkODt=0;
+let evdOD=false,evdODt=0;
+let defOD=false,defODt=0;
+
+// Boss
+let bossAlive=false,bossHP=0,bossMaxHP=0,bossType=0,bossScale=1,nextBoss=800;
+let bossDrainLast=0,bossDrainCnt=0;
+
+// Question rotation
+const asked={atk:[],evd:[],def:[]};
+
+// Modal
+let modalOpen=false,cdInterval=null,cdVal=0;
+
+// Timers
+let elapsedInterval=null;
+let shootT=0,dodgeDir=0,dodgeT=0;
+let spawnT=0,meteorT=0,missileT=0;
+
+// ============================================================
+// CANVAS
+// ============================================================
+const canvas=document.getElementById('game');
+const ctx=canvas.getContext('2d');
+const wrap=document.getElementById('gameWrap');
+function resize(){canvas.width=wrap.clientWidth;canvas.height=wrap.clientHeight;}
+resize();window.addEventListener('resize',resize);
+const $=id=>document.getElementById(id);
+const W=()=>canvas.width, H=()=>canvas.height;
+
+// ============================================================
+// TITLE SCREEN
+// ============================================================
+const tc=$('titleCanvas'),tx=tc.getContext('2d');
+const ts=Array.from({length:220},()=>({x:Math.random()*1920,y:Math.random()*1080,s:Math.random()*1.4+0.3,sp:Math.random()*0.8+0.2}));
+let titleOn=true;
+function animTitle(){
+  if(!titleOn)return;
+  tc.width=window.innerWidth;tc.height=window.innerHeight;
+  tx.fillStyle='#040913';tx.fillRect(0,0,tc.width,tc.height);
+  ts.forEach(s=>{s.x-=s.sp;if(s.x<0){s.x=tc.width;s.y=Math.random()*tc.height;}
+    tx.fillStyle=`rgba(142,214,255,${0.2+s.sp*0.2})`;tx.beginPath();tx.arc(s.x,s.y,s.s,0,Math.PI*2);tx.fill();});
+  requestAnimationFrame(animTitle);
+}
+animTitle();
+$('startBtn').onclick=()=>{titleOn=false;$('titleScreen').classList.add('hidden');startGame();};
+$('btnMenu').onclick=()=>{$('gameover').classList.remove('show');$('titleScreen').classList.remove('hidden');titleOn=true;animTitle();};
+if(QB.length === 0) { $('startBtn').disabled = true; $('startBtn').textContent = '⌛ LOADING DATA...'; }
+
+// ============================================================
+// STARS
+// ============================================================
+const stars=Array.from({length:180},()=>({x:Math.random()*1920,y:Math.random()*1080,s:Math.random()*1.5+0.3,sp:Math.random()*1.5+0.3}));
+
+function drawBG(){
+  let bg='#040913';
+  if(bossAlive&&fc%60<30)bg='#0a0410';
+  if(evdOD)bg='#021209';
+  ctx.fillStyle=bg;ctx.fillRect(0,0,W(),H());
+  // Grid lines (from ChatGPT version — nice touch)
+  ctx.strokeStyle='rgba(0,200,255,0.03)';ctx.lineWidth=1;
+  for(let i=0;i<W();i+=80){ctx.beginPath();ctx.moveTo(i,0);ctx.lineTo(i,H());ctx.stroke();}
+  for(let i=0;i<H();i+=80){ctx.beginPath();ctx.moveTo(0,i);ctx.lineTo(W(),i);ctx.stroke();}
+  // Stars
+  stars.forEach(s=>{s.x-=s.sp;if(s.x<0){s.x=W();s.y=Math.random()*H();}
+    ctx.fillStyle=`rgba(200,230,255,${0.35+s.sp*0.2})`;ctx.beginPath();ctx.arc(s.x,s.y,s.s,0,Math.PI*2);ctx.fill();});
+}
+
+// ============================================================
+// SHIP
+// ============================================================
+const ship={x:160,y:0,vy:0,targetY:0,shieldAnim:0,hitFlash:0};
+
+function drawShip(){
+  const px=ship.x,py=ship.y;
+  const glitch=(AP===0&&!atkOD)&&fc%4<2;
+  ctx.save();
+  if(glitch)ctx.translate(Math.random()*5-2.5,Math.random()*5-2.5);
+  if(ship.hitFlash>0){ctx.globalAlpha=0.4+Math.sin(ship.hitFlash)*0.6;ship.hitFlash--;}
+
+  // Defense drones orbiting
+  if(defOD){
+    for(let i=0;i<3;i++){
+      const a=fc*0.07+i*(Math.PI*2/3);
+      const ox=px+Math.cos(a)*56,oy=py+Math.sin(a)*36;
+      ctx.fillStyle='#66BB6A';ctx.shadowBlur=8;ctx.shadowColor='#66BB6A';
+      ctx.fillRect(ox-5,oy-5,10,10);ctx.shadowBlur=0;
+      ctx.strokeStyle='rgba(102,187,106,0.15)';ctx.lineWidth=1;
+      ctx.beginPath();ctx.moveTo(px,py);ctx.lineTo(ox,oy);ctx.stroke();
+    }
+  }
+
+  // Evade burst ring
+  if(evdOD){
+    ctx.strokeStyle=`rgba(66,165,245,${0.2+Math.sin(fc*0.18)*0.15})`;ctx.lineWidth=3;
+    ctx.beginPath();ctx.arc(px,py,54+Math.sin(fc*0.14)*7,0,Math.PI*2);ctx.stroke();
+  }
+
+  // Shield aura
+  if(ship.shieldAnim>0){
+    const al=ship.shieldAnim/30;
+    ctx.strokeStyle=`rgba(102,187,106,${al})`;ctx.lineWidth=2.5;
+    ctx.shadowBlur=8;ctx.shadowColor='#66BB6A';
+    ctx.beginPath();ctx.ellipse(px,py,42,28,0,0,Math.PI*2);ctx.stroke();
+    ctx.shadowBlur=0;ship.shieldAnim--;
+  }
+
+  // Attack overdrive aura
+  if(atkOD){
+    ctx.shadowBlur=12+Math.sin(fc*0.25)*5;ctx.shadowColor='#EF5350';
+    ctx.strokeStyle='rgba(239,83,80,0.25)';ctx.lineWidth=2;
+    ctx.beginPath();ctx.ellipse(px,py,50,33,0,0,Math.PI*2);ctx.stroke();
+    ctx.shadowBlur=0;
+  }
+
+  // Engine flame
+  const flameC=atkOD?'#FFD54F':'#42A5F5';
+  ctx.fillStyle=flameC;ctx.shadowBlur=atkOD?12:5;ctx.shadowColor=flameC;
+  ctx.beginPath();
+  ctx.moveTo(px-26,py-(3+Math.sin(fc*0.3)*2));
+  ctx.lineTo(px-(40+Math.sin(fc*0.5)*5),py);
+  ctx.lineTo(px-26,py+(3+Math.sin(fc*0.3)*2));
+  ctx.closePath();ctx.fill();ctx.shadowBlur=0;
+
+  // Hull (from ChatGPT but improved)
+  ctx.fillStyle=atkOD?'#EF5350':(glitch?'#ff2244':'#42A5F5');
+  ctx.beginPath();
+  ctx.moveTo(px+28,py);
+  ctx.lineTo(px-24,py-16);
+  ctx.lineTo(px-10,py);
+  ctx.lineTo(px-24,py+16);
+  ctx.closePath();ctx.fill();
+
+  // Cockpit accent
+  ctx.fillStyle=atkOD?'#fff':(glitch?'#ff6644':'#8ED6FF');
+  ctx.globalAlpha=0.85;
+  ctx.fillRect(px-10,py-5,18,10);
+  ctx.globalAlpha=1;
+
+  // Wing accent lines
+  ctx.strokeStyle=atkOD?'#FFD54F':(glitch?'#ff2244':'#8ED6FF');ctx.lineWidth=1.2;
+  ctx.beginPath();ctx.moveTo(px-4,py-16);ctx.lineTo(px+10,py-6);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(px-4,py+16);ctx.lineTo(px+10,py+6);ctx.stroke();
+
+  // "AI CONTROL" text on canvas
+  ctx.font='10px "Share Tech Mono"';ctx.fillStyle='rgba(142,214,255,0.3)';
+  ctx.fillText('AI CONTROL ACTIVE',16,22);
+  ctx.fillStyle='rgba(142,214,255,0.18)';
+  ctx.fillText('COMMANDER AUTHORIZATION REQUIRED',16,36);
+
+  ctx.restore();
+}
+
+// ============================================================
+// BULLETS (player)
+// ============================================================
+const bullets=[];
+
+function fireBullet(){
+  if(atkOD){
+    bullets.push({x:ship.x+28,y:ship.y-6,vx:10});
+    bullets.push({x:ship.x+28,y:ship.y,vx:12});
+    bullets.push({x:ship.x+28,y:ship.y+6,vx:10});
+  } else {
+    bullets.push({x:ship.x+28,y:ship.y,vx:9});
+  }
+}
+
+function drawBullets(){
+  for(let i=bullets.length-1;i>=0;i--){
+    const b=bullets[i];b.x+=b.vx;
+    if(b.x>W()+80){bullets.splice(i,1);continue;}
+    ctx.fillStyle=atkOD?'#FFD54F':'#8ED6FF';
+    ctx.shadowBlur=atkOD?8:4;ctx.shadowColor=ctx.fillStyle;
+    ctx.fillRect(b.x,b.y-2,atkOD?16:12,atkOD?4:3);
+    ctx.shadowBlur=0;
+  }
+}
+
+// ============================================================
+// ENEMY BULLETS
+// ============================================================
+const eBullets=[];
+function drawEBullets(){
+  for(let i=eBullets.length-1;i>=0;i--){
+    const b=eBullets[i];b.x+=b.vx;b.y+=b.vy||0;
+    if(b.x<-50){eBullets.splice(i,1);continue;}
+    ctx.fillStyle='#EF5350';ctx.shadowBlur=4;ctx.shadowColor='#EF5350';
+    ctx.fillRect(b.x,b.y-2,10,4);ctx.shadowBlur=0;
+  }
+}
+
+// ============================================================
+// ENEMIES
+// ============================================================
+const enemies=[];
+let eCooldown=120;
+function spawnEnemy(){
+  const type=wave<3?0:(wave<6?Math.floor(Math.random()*2):Math.floor(Math.random()*3));
+  enemies.push({x:W()+60,y:70+Math.random()*(H()-140),hp:1+type,maxHp:1+type,
+    spd:1.4+wave*0.22+type*0.25,type,shoot:60+Math.random()*90,shootCd:0});
+}
+function drawEnemies(){
+  const cols=['#EF5350','#CE93D8','#FF8A65'];
+  for(let i=enemies.length-1;i>=0;i--){
+    const e=enemies[i];e.x-=e.spd;
+    if(e.x<-80){enemies.splice(i,1);continue;}
+    e.shootCd--;
+    if(e.shootCd<=0){
+      eBullets.push({x:e.x-20,y:e.y,vx:-(5+wave*0.2),vy:(Math.random()-0.5)*2});
+      e.shootCd=e.shoot;beep(200,0.04);
+    }
+    // Draw
+    ctx.save();ctx.translate(e.x,e.y);
+    ctx.fillStyle='#120820';
+    ctx.beginPath();
+    if(e.type===2){ctx.arc(0,0,16,0,Math.PI*2);}
+    else{ctx.moveTo(-20,0);ctx.lineTo(20,-14-e.type*3);ctx.lineTo(10,0);ctx.lineTo(20,14+e.type*3);ctx.closePath();}
+    ctx.fill();
+    ctx.fillStyle=cols[e.type];ctx.globalAlpha=0.9;
+    ctx.beginPath();ctx.ellipse(0,0,8+e.type*2,5,0,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;
+    // HP pips
+    for(let h=0;h<e.hp;h++){ctx.fillStyle=cols[e.type];ctx.beginPath();ctx.arc(-6+h*8,e.type===2?-22:-20,2,0,Math.PI*2);ctx.fill();}
+    ctx.restore();
+  }
+}
+
+// ============================================================
+// METEORS
+// ============================================================
+const meteors=[];
+function spawnMeteor(){
+  meteors.push({x:W()+35,y:40+Math.random()*(H()-80),r:9+Math.random()*12,
+    spd:2+Math.random()*2.2,ang:Math.random()*Math.PI*2,vy:(Math.random()-0.5)*1.2});
+}
+function drawMeteors(){
+  for(let i=meteors.length-1;i>=0;i--){
+    const m=meteors[i];m.x-=m.spd;m.y+=m.vy;m.ang+=0.025;
+    m.y=Math.max(m.r,Math.min(H()-m.r,m.y));
+    if(m.x<-50){meteors.splice(i,1);continue;}
+    ctx.save();ctx.translate(m.x,m.y);ctx.rotate(m.ang);
+    ctx.fillStyle='#4a2e10';ctx.strokeStyle='#c05000';ctx.lineWidth=1.5;
+    ctx.beginPath();
+    for(let k=0;k<7;k++){const a=k/7*Math.PI*2,r2=m.r*(0.7+Math.sin(k*2.3)*0.3);
+      if(k===0)ctx.moveTo(Math.cos(a)*r2,Math.sin(a)*r2);else ctx.lineTo(Math.cos(a)*r2,Math.sin(a)*r2);}
+    ctx.closePath();ctx.fill();ctx.stroke();ctx.restore();
+  }
+}
+
+// ============================================================
+// MISSILES (homing)
+// ============================================================
+const missiles=[];
+function spawnMissile(){
+  missiles.push({x:W()+25,y:50+Math.random()*(H()-100),spd:2.2+wave*0.1});
+}
+function drawMissiles(){
+  for(let i=missiles.length-1;i>=0;i--){
+    const m=missiles[i];
+    const dx=ship.x-m.x,dy=ship.y-m.y,len=Math.sqrt(dx*dx+dy*dy);
+    if(len<1){missiles.splice(i,1);continue;}
+    m.x+=(dx/len)*m.spd;m.y+=(dy/len)*m.spd;
+    if(m.x<-50||m.y<-50||m.y>H()+50){missiles.splice(i,1);continue;}
+    const ang=Math.atan2(dy,dx);
+    ctx.save();ctx.translate(m.x,m.y);ctx.rotate(ang);
+    ctx.fillStyle='#FFD54F';ctx.shadowBlur=5;ctx.shadowColor='#FFD54F';
+    ctx.beginPath();ctx.moveTo(14,0);ctx.lineTo(-9,-5);ctx.lineTo(-9,5);ctx.closePath();ctx.fill();
+    ctx.fillStyle='#ff6b00';ctx.globalAlpha=0.8;
+    ctx.beginPath();ctx.moveTo(-9,-2.5);ctx.lineTo(-18,0);ctx.lineTo(-9,2.5);ctx.fill();
+    ctx.globalAlpha=1;ctx.shadowBlur=0;ctx.restore();
+  }
+}
+
+// ============================================================
+// BOSS
+// ============================================================
+function spawnBoss(){
+  bossAlive=true;bossMaxHP=Math.round(80*bossScale);bossHP=bossMaxHP;
+  bossType++;bossDrainLast=score;bossDrainCnt=0;
+  $('boss-hud').classList.add('show');
+  const names=['ANOMALI KELAS-X','LEVIATHAN MERAH','DESTROYER VOID','TITAN GALAKSI'];
+  $('boss-name').textContent=names[(bossType-1)%4];
+  setLog('!!! ENTITAS BESAR TERDETEKSI — SIAGA TEMPUR TERTINGGI !!!');
+  beep(110,0.25);setTimeout(()=>beep(160,0.18),120);
+}
+function drawBoss(){
+  if(!bossAlive)return;
+  const bx=W()-150,by=H()/2+Math.sin(fc*0.018)*50;
+  const sz=(60+Math.sin(fc*0.09)*8)*bossScale;
+  const c1=bossType%2===0?'#EF5350':'#CE93D8';
+  const c2=bossType%3===0?'#FF8A65':'#FFD54F';
+  ctx.save();ctx.translate(bx,by);
+  ctx.rotate(fc*0.007);ctx.strokeStyle=c1;ctx.lineWidth=1.5;
+  ctx.setLineDash([8,8]);ctx.shadowBlur=12;ctx.shadowColor=c1;
+  ctx.beginPath();ctx.arc(0,0,sz+20,0,Math.PI*2);ctx.stroke();
+  ctx.setLineDash([]);ctx.shadowBlur=0;ctx.rotate(-fc*0.007);
+  ctx.rotate(fc*0.011);ctx.strokeStyle=c1;ctx.lineWidth=4;ctx.shadowBlur=18;ctx.shadowColor=c1;
+  ctx.beginPath();for(let i=0;i<6;i++){const a=i/6*Math.PI*2;if(i===0)ctx.moveTo(Math.cos(a)*sz,Math.sin(a)*sz);else ctx.lineTo(Math.cos(a)*sz,Math.sin(a)*sz);}
+  ctx.closePath();ctx.stroke();ctx.shadowBlur=0;
+  ctx.rotate(-fc*0.022);ctx.strokeStyle=c2;ctx.lineWidth=2;
+  ctx.beginPath();for(let i=0;i<3;i++){const a=i/3*Math.PI*2;if(i===0)ctx.moveTo(Math.cos(a)*sz*0.5,Math.sin(a)*sz*0.5);else ctx.lineTo(Math.cos(a)*sz*0.5,Math.sin(a)*sz*0.5);}
+  ctx.closePath();ctx.stroke();
+  ctx.fillStyle=`rgba(255,255,255,${0.3+Math.sin(fc*0.2)*0.2})`;
+  ctx.beginPath();ctx.arc(0,0,sz*0.2,0,Math.PI*2);ctx.fill();
+  ctx.restore();
+  $('boss-bar').style.width=`${Math.max(0,bossHP/bossMaxHP*100)}%`;
+  if(bossHP<=0){
+    for(let k=0;k<4;k++)setTimeout(()=>explode(bx+Math.random()*80-40,by+Math.random()*80-40,'rgb(255,200,80)',16),k*80);
+    explode(bx,by,'rgb(255,255,255)',20);
+    bossAlive=false;bossScale+=0.25;$('boss-hud').classList.remove('show');
+    score+=400+wave*40;combo=Math.min(8,combo+2);maxCombo=Math.max(maxCombo,combo);
+    setLog('ANOMALI DIMUSNAHKAN — GALAKSI STABIL');beep(880,0.2);
+  }
+}
+
+// ============================================================
+// PARTICLES
+// ============================================================
+const parts=[];
+function explode(x,y,col,n=14){
+  for(let i=0;i<n;i++){const spd=2+Math.random()*5,ang=Math.random()*Math.PI*2;
+    parts.push({x,y,vx:Math.cos(ang)*spd,vy:Math.sin(ang)*spd,life:18+Math.random()*22,max:40,col});}
+}
+function drawParticles(){
+  for(let i=parts.length-1;i>=0;i--){
+    const p=parts[i];p.x+=p.vx;p.y+=p.vy;p.vx*=0.93;p.vy*=0.93;p.life--;
+    const al=p.life/p.max;
+    ctx.fillStyle=p.col.replace(')',`,${al})`).replace('rgb','rgba');
+    ctx.beginPath();ctx.arc(p.x,p.y,1.5+al*2.5,0,Math.PI*2);ctx.fill();
+    if(p.life<=0)parts.splice(i,1);
+  }
+}
+
+// ============================================================
+// COLLISIONS
+// ============================================================
+function d2(ax,ay,bx,by){return Math.sqrt((ax-bx)**2+(ay-by)**2);}
+
+function checkCollisions(){
+  // Bullets vs enemies
+  for(let bi=bullets.length-1;bi>=0;bi--){
+    const b=bullets[bi];let hit=false;
+    for(let ei=enemies.length-1;ei>=0;ei--){
+      const e=enemies[ei];
+      if(d2(b.x,b.y,e.x,e.y)<22+e.type*4){
+        e.hp--;bullets.splice(bi,1);hit=true;
+        if(e.hp<=0){
+          explode(e.x,e.y,`rgb(${e.type===0?'239,83,80':e.type===1?'206,147,216':'255,138,101'})`);
+          enemies.splice(ei,1);score+=60*wave;
+          setLog(`MUSUH DIMUSNAHKAN +${60*wave}pts`);beep(380+e.type*60,0.07);
+        } else {explode(e.x,e.y,'rgb(200,200,200)',4);}
+        break;
+      }
+    }
+    if(!hit&&bossAlive){const bx=W()-150,by=H()/2;
+      if(d2(b.x,b.y,bx,by)<72*bossScale){bossHP-=(atkOD?5:2);bullets.splice(bi,1);}
+    }
+  }
+
+  // Enemy bullets vs ship
+  for(let i=eBullets.length-1;i>=0;i--){
+    const b=eBullets[i];
+    const dist=d2(b.x,b.y,ship.x,ship.y);
+    // Evade: dodge if evade pool available (from ChatGPT mechanic)
+    if(dist<55&&(EP>0||evdOD)){
+      if(!evdOD)EP--;
+      ship.y+=(Math.random()-0.5)*160;
+      explode(ship.x,ship.y,'rgb(66,165,245)',6);
+      eBullets.splice(i,1);beep(700,0.06);continue;
+    }
+    // Defense: absorb if defense pool available
+    if(dist<40&&(DP>0||defOD)){
+      if(!defOD)DP--;
+      ship.shieldAnim=25;explode(b.x,b.y,'rgb(102,187,106)',5);
+      eBullets.splice(i,1);beep(300,0.07);continue;
+    }
+    // Hit
+    if(dist<32){
+      eBullets.splice(i,1);hp=Math.max(0,hp-1);
+      ship.hitFlash=8;combo=1;
+      explode(ship.x,ship.y,'rgb(255,255,255)',10);beep(100,0.18);
+      setLog('!!! HULL DAMAGE — DEPLOY DEFENSE AUTHORIZATION !!!');
+      if(hp<=0)gameOver();
+    }
+  }
+
+  // Meteors vs ship
+  for(let i=meteors.length-1;i>=0;i--){
+    if(d2(meteors[i].x,meteors[i].y,ship.x,ship.y)<meteors[i].r+20){
+      meteors.splice(i,1);
+      if(DP>0||defOD){if(!defOD)DP--;ship.shieldAnim=25;beep(220,0.08);}
+      else{hp=Math.max(0,hp-1);ship.hitFlash=8;combo=1;beep(100,0.15);explode(ship.x,ship.y,'rgb(255,107,0)',8);if(hp<=0)gameOver();}
+    }
+  }
+
+  // Missiles vs ship
+  for(let i=missiles.length-1;i>=0;i--){
+    if(d2(missiles[i].x,missiles[i].y,ship.x,ship.y)<26){
+      missiles.splice(i,1);
+      if(DP>0||defOD){if(!defOD)DP--;ship.shieldAnim=25;beep(200,0.08);}
+      else{hp=Math.max(0,hp-2);ship.hitFlash=8;combo=1;beep(80,0.18);explode(ship.x,ship.y,'rgb(255,213,79)',10);if(hp<=0)gameOver();}
+    }
+  }
+}
+
+// ============================================================
+// AI UPDATE
+// ============================================================
+function aiUpdate(){
+  // Overdrive countdowns
+  if(atkOD){atkODt--;if(atkODt<=0){atkOD=false;setLog('ATTACK OVERDRIVE HABIS');showBanner(false);renderUI();}}
+  if(evdOD){
+    evdODt--;
+    if(fc%14===0)for(let i=0;i<6;i++){const a=i/6*Math.PI*2;parts.push({x:ship.x,y:ship.y,vx:Math.cos(a)*8,vy:Math.sin(a)*8,life:20,max:20,col:'rgb(66,165,245)'});}
+    for(let i=enemies.length-1;i>=0;i--){explode(enemies[i].x,enemies[i].y,'rgb(66,165,245)',5);enemies.splice(i,1);}
+    for(let i=meteors.length-1;i>=0;i--){explode(meteors[i].x,meteors[i].y,'rgb(150,150,150)',4);meteors.splice(i,1);}
+    for(let i=missiles.length-1;i>=0;i--){explode(missiles[i].x,missiles[i].y,'rgb(255,213,79)',5);missiles.splice(i,1);}
+    if(evdODt<=0){evdOD=false;setLog('EVADE OVERDRIVE SELESAI');showBanner(false);renderUI();}
+  }
+  if(defOD){defODt--;if(defODt<=0){defOD=false;DP=4;setLog('DEFENSE DRONES DINONAKTIFKAN');showBanner(false);renderUI();}}
+
+  // Auto shoot
+  shootT++;
+  const si=atkOD?4:(AP>0?22:55);
+  if(shootT>=si){
+    shootT=0;
+    let tgt=null,cd=Infinity;
+    enemies.forEach(e=>{const d=d2(ship.x,ship.y,e.x,e.y);if(d<cd){cd=d;tgt=e;}});
+    if(!tgt&&bossAlive)tgt={x:W()-150,y:H()/2};
+    if(tgt&&AP>0){fireBullet();if(!atkOD)AP--;beep(680,0.05);}
+  }
+
+  // Auto dodge (evade mechanic from ChatGPT — AI moves toward enemy)
+  let threat=null,td=Infinity;
+  eBullets.forEach(b=>{const d=d2(ship.x,ship.y,b.x,b.y);if(d<200&&d<td){td=d;threat=b;}});
+  if(!threat)meteors.forEach(m=>{const d=d2(ship.x,ship.y,m.x,m.y);if(d<200&&d<td){td=d;threat=m;}});
+  if(!threat)missiles.forEach(m=>{const d=d2(ship.x,ship.y,m.x,m.y);if(d<180&&d<td){td=d;threat=m;}});
+  if(threat&&(EP>0||evdOD)){dodgeDir=ship.y>threat.y?1:-1;dodgeT=20;}
+
+  // AI tracks nearest enemy Y (ChatGPT behavior)
+  if(enemies.length>0&&!threat){
+    const nearest=enemies.reduce((prev,cur)=>d2(ship.x,ship.y,cur.x,cur.y)<d2(ship.x,ship.y,prev.x,prev.y)?cur:prev);
+    ship.targetY=nearest.y;
+  } else if(!threat){ship.targetY=H()/2;}
+
+  if(dodgeT>0){ship.vy=dodgeDir*3.5;dodgeT--;}
+  else{const dy=ship.targetY-ship.y;ship.vy=ship.vy*0.88+dy*0.04;}
+  ship.y+=ship.vy;ship.y=Math.max(50,Math.min(H()-50,ship.y));
+
+  // Boss drain
+  if(bossAlive){
+    const prog=score-bossDrainLast;const exp=Math.floor(prog/1000);const warn=(prog%1000)>750;
+    ['card-atk','card-evd','card-def'].forEach(id=>{const el=$(id);warn?el.classList.add('warn-pulse'):el.classList.remove('warn-pulse');});
+    if(exp>bossDrainCnt){AP=Math.max(0,AP-1);EP=Math.max(0,EP-1);DP=Math.max(0,DP-1);
+      bossDrainCnt=exp;setLog('!!! RADIASI BOSS — POOL TERDEGRADASI !!!');renderUI();}
+  }
+}
+
+// ============================================================
+// SPAWN CONTROL & WAVE
+// ============================================================
+function spawnControl(){
+  spawnT++;if(spawnT>=Math.max(60,130-wave*10)){spawnT=0;spawnEnemy();}
+  meteorT++;if(meteorT>=Math.max(90,180-wave*8)){meteorT=0;spawnMeteor();}
+  if(wave>=2){missileT++;if(missileT>=Math.max(120,300-wave*15)){missileT=0;spawnMissile();}}
+  if(score>=nextBoss){
+    if(!bossAlive)spawnBoss();
+    else{bossScale+=0.25;bossHP+=40;bossMaxHP+=40;bossDrainCnt=0;bossDrainLast=score;setLog('!!! ANOMALI MENGUAT !!!');}
+    nextBoss=score+800+Math.random()*400;
+  }
+}
+
+// ============================================================
+// CANVAS HUD
+// ============================================================
+function drawCanvasHUD(){
+  if(combo>1){
+    const cc=combo>=5?'#EF5350':(combo>=3?'#FFD54F':'#66BB6A');
+    ctx.font='bold 12px Orbitron';ctx.fillStyle=cc;ctx.shadowBlur=8;ctx.shadowColor=cc;
+    ctx.fillText(`×${combo} COMBO`,16,H()-14);ctx.shadowBlur=0;
+  }
+  let rt='',rc='';
+  if(atkOD){rt=`ATK OVERDRIVE ${Math.ceil(atkODt/60)}s`;rc='#EF5350';}
+  else if(evdOD){rt=`EVD OVERDRIVE ${Math.ceil(evdODt/60)}s`;rc='#42A5F5';}
+  else if(defOD){rt=`DEF DRONES ${Math.ceil(defODt/60)}s`;rc='#66BB6A';}
+  if(rt){ctx.font='9px Orbitron';ctx.fillStyle=rc;ctx.shadowBlur=6;ctx.shadowColor=rc;ctx.fillText(rt,W()-160,H()-14);ctx.shadowBlur=0;}
+}
+
+// ============================================================
+// UI RENDER
+// ============================================================
+function renderUI(){
+  $('vAtk').textContent=AP;$('fillAtk').style.width=`${AP/MAX*100}%`;
+  $('vEvd').textContent=EP;$('fillEvd').style.width=`${EP/MAX*100}%`;
+  $('vDef').textContent=DP;$('fillDef').style.width=`${DP/MAX*100}%`;
+  $('vHp').textContent=hp;$('fillHp').style.width=`${hp/maxHp*100}%`;
+  $('vScore').textContent=score.toLocaleString();
+  $('vWave').textContent=String(wave).padStart(2,'0');
+  $('waveLabel').textContent=`WAVE ${String(wave).padStart(2,'0')}`;
+  $('vCombo').textContent=`×${combo}`;
+  const m=String(Math.floor(elapsed/60)).padStart(2,'0'),s=String(elapsed%60).padStart(2,'0');
+  $('vTime').textContent=`${m}:${s}`;
+}
+function setLog(msg){$('log').textContent='› '+msg;}
+function showBanner(show,cls='',txt=''){
+  const b=$('reward-banner');if(!show){b.className='';return;}b.className=`show ${cls}`;b.textContent=txt;
+}
+function updateBadges(){
+  const lv=wave>=8?'HARD':(wave>=4?'NORMAL':'EASY');
+  const pts=wave>=8?5:(wave>=4?2:1);
+  $('badgeAtk').textContent=`FIREPOWER · ${lv} +${pts}`;
+  $('badgeEvd').textContent=`EVASION · ${lv} +${pts}`;
+  $('badgeDef').textContent=`BARRIER · ${lv} +${pts}`;
+  $('qlvl').className=lv.toLowerCase();
+  $('qlvl').textContent=`${lv} +${pts}`;
+}
+
+// ============================================================
+// COMMAND MODE SELECTION
+// ============================================================
+function setMode(mode){
+  currentMode=mode;
+  $('btnAtk').className='cmdBtn'+(mode==='atk'?' activeAtk':'');
+  $('btnEvd').className='cmdBtn'+(mode==='evd'?' activeEvd':'');
+  $('btnDef').className='cmdBtn'+(mode==='def'?' activeDef':'');
+  if(!modalOpen)generateQuestion();
+}
+$('btnAtk').onclick=()=>setMode('atk');
+$('btnEvd').onclick=()=>setMode('evd');
+$('btnDef').onclick=()=>setMode('def');
+
+// ============================================================
+// MODAL / QUESTIONS
+// ============================================================
+function getLevel(){return wave>=8?'hard':(wave>=4?'normal':'easy');}
+function getPts(lv){return lv==='hard'?5:(lv==='normal'?2:1);}
+
+function generateQuestion(){
+  if(modalOpen)return;
+  if(QB.length === 0) return; // Tunggu data siap
+  modalOpen=true;total++;
+  const lv=getLevel();const pts=getPts(lv);
+  const src=QB.filter(q=>q.t===currentMode&&q.l===lv);
+  const fallback=QB.filter(q=>q.t===currentMode);
+  const pool=src.length>0?src:fallback;
+
+  // Smart rotation
+  let available=[];
+  pool.forEach(q=>{const qi=QB.indexOf(q);if(!asked[currentMode].includes(qi))available.push({q,qi});});
+  if(available.length===0){pool.forEach(q=>{const qi=QB.indexOf(q);asked[currentMode]=asked[currentMode].filter(x=>x!==qi);available.push({q,qi});});}
+  const pick=available[Math.floor(Math.random()*available.length)];
+  asked[currentMode].push(pick.qi);
+  const q=pick.q;
+
+  // Style modal by mode
+  $('authTitle').textContent=`${currentMode.toUpperCase()} COMMAND VERIFICATION`;
+  $('questionText').textContent=q.q;
+  $('qlvl').className=lv;$('qlvl').textContent=`${lv.toUpperCase()} +${pts}`;
+  $('feedback').textContent='';
+
+  const aDiv=$('answers');aDiv.innerHTML='';
+  const shuffled=[...q.o].sort(()=>Math.random()-0.5);
+  shuffled.forEach((opt,idx)=>{
+    const btn=document.createElement('button');btn.className='ansBtn';
+    btn.textContent=`[${String.fromCharCode(65+idx)}] ${opt}`;
+    btn.onclick=()=>checkAnswer(btn,opt,q.a,pts,lv,aDiv);
+    aDiv.appendChild(btn);
+  });
+
+  // Countdown
+  const tl=lv==='hard'?20:(lv==='normal'?15:12);
+  cdVal=tl;
+  const lvC={easy:'var(--green)',normal:'var(--warn)',hard:'var(--purple)'};
+  $('countdown-bar').style.background=lvC[lv];
+  $('countdown-bar').style.width='100%';
+  $('countdown-txt').textContent=cdVal;
+  clearInterval(cdInterval);
+  cdInterval=setInterval(()=>{
+    cdVal--;$('countdown-bar').style.width=`${cdVal/tl*100}%`;$('countdown-txt').textContent=cdVal;
+    if(cdVal<=4)$('countdown-bar').style.background='var(--danger)';
+    if(cdVal<=0){clearInterval(cdInterval);
+      aDiv.querySelectorAll('.ansBtn').forEach(b=>{b.disabled=true;if(b.textContent.includes(q.a))b.classList.add('ok');});
+      $('feedback').textContent='✗ WAKTU HABIS — TIDAK ADA PERUBAHAN';$('feedback').style.color='var(--danger)';
+      beep(180,0.12);combo=1;setTimeout(nextQuestion,1000);}
+  },1000);
+}
+
+function checkAnswer(btn,chosen,correct,pts,lv,aDiv){
+  clearInterval(cdInterval);aDiv.querySelectorAll('.ansBtn').forEach(b=>b.disabled=true);
+  const fb=$('feedback');
+  if(chosen===correct){
+    btn.classList.add('ok');combo=Math.min(8,combo+1);maxCombo=Math.max(maxCombo,combo);
+    const gain=Math.ceil(pts*(1+Math.max(0,combo-1)*0.5));
+    if(currentMode==='atk'){AP=Math.min(MAX,AP+gain);if(AP>=MAX&&!atkOD){atkOD=true;atkODt=300+Math.floor(score/3000)*60;beep(880,0.15);setLog('!!! ATTACK OVERDRIVE — TRIPLE SHOT !!!');showBanner(true,'ratk','⚡ ATTACK OVERDRIVE ACTIVE');}}
+    if(currentMode==='evd'){EP=Math.min(MAX,EP+gain);if(EP>=MAX&&!evdOD){evdOD=true;evdODt=360+Math.floor(score/3000)*60;beep(880,0.15);setLog('!!! EVADE OVERDRIVE — ZONA DESTRUKSI !!!');showBanner(true,'revd','◎ EVADE OVERDRIVE ACTIVE');}}
+    if(currentMode==='def'){DP=Math.min(MAX,DP+gain);if(DP>=MAX&&!defOD){defOD=true;defODt=480+Math.floor(score/3000)*60;beep(880,0.15);setLog('!!! DEFENSE DRONES — INVINCIBLE !!!');showBanner(true,'rdef','⬡ DEFENSE DRONES ACTIVE');}}
+    const cb=combo>1?` [COMBO ×${combo} → +${gain}]`:'';
+    fb.textContent=`✓ OTORISASI TERKONFIRMASI — +${gain}${cb}`;fb.style.color='var(--green)';
+    correctCnt++;score+=combo*10;beep(660,0.1);setTimeout(()=>beep(880,0.12),80);
+  } else {
+    btn.classList.add('no');aDiv.querySelectorAll('.ansBtn').forEach(b=>{if(b.textContent.includes(correct))b.classList.add('ok');});
+    combo=1;fb.textContent='✗ KODE OTORISASI SALAH';fb.style.color='var(--danger)';beep(200,0.12);
+  }
+  renderUI();setTimeout(nextQuestion,1300);
+}
+
+function nextQuestion(){
+  clearInterval(cdInterval);modalOpen=false;
+  $('countdown-bar').style.width='100%';
+  generateQuestion();
+}
+
+// ============================================================
+// WAVE CHECK
+// ============================================================
+function checkWave(){
+  // Wave advances based on score
+  const newWave=Math.floor(score/500)+1;
+  if(newWave>wave){wave=newWave;setLog(`◈ WAVE ${String(wave).padStart(2,'0')} — ANCAMAN MENINGKAT`);updateBadges();renderUI();}
+}
+
+// ============================================================
+// SOUND
+// ============================================================
+let aCtx=null;
+function beep(f,v,dur=0.16,type='square'){
+  try{if(!aCtx)aCtx=new(window.AudioContext||window.webkitAudioContext)();
+    const o=aCtx.createOscillator(),g=aCtx.createGain();o.connect(g);g.connect(aCtx.destination);
+    o.frequency.value=f;o.type=type;g.gain.setValueAtTime(v,aCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001,aCtx.currentTime+dur);o.start();o.stop(aCtx.currentTime+dur);}catch(e){}
+}
+
+// ============================================================
+// GAME OVER / START
+// ============================================================
+function gameOver(){
+  running=false;clearInterval(cdInterval);clearInterval(elapsedInterval);
+  const eff=total>0?Math.round(correctCnt/total*100):0;
+  const g=eff>=95?'S':(eff>=80?'A':(eff>=65?'B':(eff>=45?'C':'D')));
+  const el=$('go-grade');el.textContent=g;el.className=`go-grade g${g}`;
+  $('go-stats').innerHTML=`<b>SKOR AKHIR</b> : ${score.toLocaleString()}<br><b>WAVE DICAPAI</b> : ${wave}<br><b>WAKTU BERMAIN</b> : ${$('vTime').textContent}<br><b>JAWABAN BENAR</b> : ${correctCnt}/${total} (${eff}%)<br><b>COMBO TERBAIK</b> : ×${maxCombo}`;
+  $('go-title').textContent=hp<=0?'HULL BREACHED':'MISSION COMPLETE';
+  $('gameover').classList.add('show');beep(200,0.2,0.5,'sawtooth');
+}
+
+$('btnRestart').onclick=startGame;
+
+function startGame(){
+  AP=5;EP=5;DP=5;hp=10;score=0;wave=1;elapsed=0;fc=0;
+  correctCnt=0;total=0;combo=1;maxCombo=1;
+  atkOD=false;atkODt=0;evdOD=false;evdODt=0;defOD=false;defODt=0;
+  bossAlive=false;bossHP=0;bossType=0;bossScale=1;nextBoss=800;bossDrainLast=0;bossDrainCnt=0;
+  asked.atk=[];asked.evd=[];asked.def=[];modalOpen=false;
+  enemies.length=0;bullets.length=0;eBullets.length=0;meteors.length=0;missiles.length=0;parts.length=0;
+  ship.y=0;ship.vy=0;ship.shieldAnim=0;ship.hitFlash=0;
+  spawnT=0;meteorT=0;missileT=0;shootT=0;dodgeT=0;dodgeDir=0;
+  clearInterval(cdInterval);clearInterval(elapsedInterval);
+  $('gameover').classList.remove('show');$('boss-hud').classList.remove('show');
+  $('reward-banner').className='';
+  ['card-atk','card-evd','card-def'].forEach(id=>$(id).classList.remove('warn-pulse'));
+  currentMode='atk';setMode('atk');
+  updateBadges();renderUI();setLog('[ CCL PROTOCOL ACTIVE — PILIH COMMAND DAN JAWAB PERTANYAAN ]');
+  elapsedInterval=setInterval(()=>{elapsed++;renderUI();},1000);
+  if(!running){running=true;loop();}
+}
+
+// ============================================================
+// MAIN LOOP
+// ============================================================
+function loop(){
+  if(!running)return;
+  fc++;resize();
+  spawnControl();aiUpdate();checkCollisions();
+  if(fc%120===0)checkWave();
+  if(fc%10===0)renderUI();
+  drawBG();drawMeteors();drawMissiles();drawEBullets();drawEnemies();drawBullets();drawBoss();drawShip();drawParticles();drawCanvasHUD();
+  requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>
