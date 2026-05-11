@@ -146,11 +146,21 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-fam
 .gobtn.sec{border:1px solid var(--dim);background:transparent;color:var(--dim)}.gobtn.sec:hover{border-color:var(--text);color:var(--text)}
 
 @media(max-width:700px){
-  #resourceRow{grid-template-columns:repeat(2,1fr)}
-  #commandPanel{flex-direction:column}
-  #commandButtons{width:100%;flex-direction:row}
-  .cmdBtn{flex:1;text-align:center}
-  #answers{grid-template-columns:1fr}
+  #bottomPanel{position:absolute;bottom:0;left:0;right:0;width:100%;background:linear-gradient(to top, rgba(6,16,30,0.98), transparent);border:none;padding:6px 10px;z-index:100}
+  #resourceRow{grid-template-columns:repeat(4,1fr);gap:4px;margin-bottom:6px}
+  .card{padding:4px;border-radius:3px;background:rgba(0,0,0,0.5)}
+  .card h3{display:none}
+  .card .val{display:block;font-size:10px;text-align:center;margin-bottom:2px}
+  .card .bar{margin-top:0;height:3px}
+  #commandPanel{flex-direction:column;gap:6px}
+  #commandButtons{width:100%;flex-direction:row;gap:5px}
+  .cmdBtn{flex:1;text-align:center;padding:6px 4px;font-size:8px}
+  .cmdBtn .csub{display:none}
+  #questionBox{padding:8px;background:rgba(0,0,0,0.4)}
+  #authTitle{font-size:6px}
+  #questionText{font-size:11px;min-height:auto;margin-bottom:6px}
+  #answers{grid-template-columns:1fr;gap:4px}
+  .ansBtn{padding:6px 8px;font-size:10px}
 }
 @media(max-height:500px){
   #topbar{padding:4px 12px}
