@@ -146,11 +146,20 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-fam
 .gobtn.sec{border:1px solid var(--dim);background:transparent;color:var(--dim)}.gobtn.sec:hover{border-color:var(--text);color:var(--text)}
 
 @media(max-width:700px){
-  #resourceRow{grid-template-columns:repeat(2,1fr)}
-  #commandPanel{flex-direction:column}
-  #commandButtons{width:100%;flex-direction:row}
-  .cmdBtn{flex:1;text-align:center}
-  #answers{grid-template-columns:1fr}
+  #bottomPanel{position:absolute;bottom:0;left:0;right:0;width:100%;background:transparent;padding:8px 10px;}
+  #resourceRow{grid-template-columns:repeat(2,1fr);gap:6px;margin-bottom:8px}
+  .card{padding:6px 8px;}
+  .card h3{font-size:6px;margin-bottom:2px;}
+  .card .val{font-size:18px;display:none;}
+  .card .bar{margin-top:3px;height:3px;}
+  #commandPanel{flex-direction:column;gap:8px;}
+  #commandButtons{width:100%;flex-direction:row;gap:6px;}
+  .cmdBtn{flex:1;text-align:center;font-size:8px;padding:7px 6px;}
+  .cmdBtn .csub{font-size:5px;}
+  #questionBox{padding:10px;}
+  #questionText{font-size:12px;min-height:auto;margin-bottom:8px;}
+  #answers{grid-template-columns:1fr;gap:4px;}
+  .ansBtn{font-size:10px;padding:7px 8px;}
 }
 @media(max-height:500px){
   #topbar{padding:4px 12px}
@@ -425,6 +434,32 @@ function resize(){canvas.width=wrap.clientWidth;canvas.height=wrap.clientHeight;
 resize();window.addEventListener('resize',resize);
 const $=id=>document.getElementById(id);
 const W=()=>canvas.width, H=()=>canvas.height;
+
+let autoHideTimer;
+let lastActivityTime = Date.now();
+let uiHidden = false;
+
+function resetAutoHideTimer() {
+  lastActivityTime = Date.now();
+  if (uiHidden) {
+    $('bottomPanel').style.opacity = '1';
+    $('topbar').style.opacity = '1';
+    uiHidden = false;
+  }
+  clearTimeout(autoHideTimer);
+  if (running) { // Only auto-hide when game is running
+    autoHideTimer = setTimeout(() => {
+      if (Date.now() - lastActivityTime >= 3000) {
+        $('bottomPanel').style.opacity = '0.1';
+        $('topbar').style.opacity = '0.1';
+        uiHidden = true;
+      }
+    }, 3000);
+  }
+}
+
+document.addEventListener('touchstart', resetAutoHideTimer, { passive: true });
+document.addEventListener('mousemove', resetAutoHideTimer, { passive: true }); // Also reset on mouse move for desktop
 
 // ============================================================
 // TITLE SCREEN
@@ -921,6 +956,7 @@ function setMode(mode){
   $('btnEvd').className='cmdBtn'+(mode==='evd'?' activeEvd':'');
   $('btnDef').className='cmdBtn'+(mode==='def'?' activeDef':'');
   if(!modalOpen)generateQuestion();
+  resetAutoHideTimer(); // Reset timer on command button click
 }
 $('btnAtk').onclick=()=>setMode('atk');
 $('btnEvd').onclick=()=>setMode('evd');
@@ -998,6 +1034,7 @@ function checkAnswer(btn,chosen,correct,pts,lv,aDiv){
     combo=1;fb.textContent='✗ KODE OTORISASI SALAH';fb.style.color='var(--danger)';beep(200,0.12);
   }
   renderUI();setTimeout(nextQuestion,1300);
+  resetAutoHideTimer(); // Reset timer on answer button click
 }
 
 function nextQuestion(){
@@ -1030,7 +1067,7 @@ function beep(f,v,dur=0.16,type='square'){
 // GAME OVER / START
 // ============================================================
 function gameOver(){
-  running=false;clearInterval(cdInterval);clearInterval(elapsedInterval);
+  running=false;clearInterval(cdInterval);clearInterval(elapsedInterval);clearTimeout(autoHideTimer);
   const eff=total>0?Math.round(correctCnt/total*100):0;
   const g=eff>=95?'S':(eff>=80?'A':(eff>=65?'B':(eff>=45?'C':'D')));
   const el=$('go-grade');el.textContent=g;el.className=`go-grade g${g}`;
@@ -1042,6 +1079,7 @@ function gameOver(){
 $('btnRestart').onclick=startGame;
 
 function startGame(){
+  clearTimeout(autoHideTimer); // Clear any existing auto-hide timer
   AP=5;EP=5;DP=5;hp=10;score=0;wave=1;elapsed=0;fc=0;
   correctCnt=0;total=0;combo=1;maxCombo=1;
   atkOD=false;atkODt=0;evdOD=false;evdODt=0;defOD=false;defODt=0;
@@ -1058,6 +1096,7 @@ function startGame(){
   updateBadges();renderUI();setLog('[ CCL PROTOCOL ACTIVE — PILIH COMMAND DAN JAWAB PERTANYAAN ]');
   elapsedInterval=setInterval(()=>{elapsed++;renderUI();},1000);
   if(!running){running=true;loop();}
+  resetAutoHideTimer(); // Start the auto-hide timer
 }
 
 // ============================================================
