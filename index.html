@@ -191,7 +191,7 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-fam
     <span style="color:var(--atk)">⚡ ATTACK</span> · Tembakan laser otomatis &nbsp;|&nbsp;
     <span style="color:var(--evd)">◎ EVADE</span> · Hindari proyektil musuh &nbsp;|&nbsp;
     <span style="color:var(--def)">⬡ DEFENSE</span> · Serap damage masuk<br>
-    EASY <span style="color:var(--green)">+1</span> &nbsp;|&nbsp; NORMAL <span style="color:var(--warn)">+2</span> &nbsp;|&nbsp; HARD <span style="color:var(--purple)">+5</span> &nbsp;&nbsp;·&nbsp;&nbsp; Pool penuh → MODE OVERDRIVE aktif!
+    MIN POINTS (EASY): <span style="color:var(--atk)">ATK +13</span> | <span style="color:var(--evd)">EVD +8</span> | <span style="color:var(--def)">DEF +5</span> &nbsp;&nbsp;·&nbsp;&nbsp; Pool penuh → MODE OVERDRIVE aktif!
   </div>
 </div>
 
@@ -249,15 +249,15 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-fam
       <div id="commandButtons">
         <button class="cmdBtn activeAtk" id="btnAtk">
           ⚡ ATTACK CMD
-          <span class="csub" id="badgeAtk">FIREPOWER · EASY +1</span>
+          <span class="csub" id="badgeAtk">FIREPOWER · EASY +13</span>
         </button>
         <button class="cmdBtn" id="btnEvd">
           ◎ EVADE CMD
-          <span class="csub" id="badgeEvd">EVASION · EASY +1</span>
+          <span class="csub" id="badgeEvd">EVASION · EASY +8</span>
         </button>
         <button class="cmdBtn" id="btnDef">
           ⬡ DEFENSE CMD
-          <span class="csub" id="badgeDef">BARRIER · EASY +1</span>
+          <span class="csub" id="badgeDef">BARRIER · EASY +5</span>
         </button>
       </div>
 
@@ -836,12 +836,15 @@ function showBanner(show,cls='',txt=''){
 }
 function updateBadges(){
   const lv=wave>=8?'HARD':(wave>=4?'NORMAL':'EASY');
-  const pts=wave>=8?5:(wave>=4?2:1);
-  $('badgeAtk').textContent=`FIREPOWER · ${lv} +${pts}`;
-  $('badgeEvd').textContent=`EVASION · ${lv} +${pts}`;
-  $('badgeDef').textContent=`BARRIER · ${lv} +${pts}`;
+  const pAtk = getPts(lv.toLowerCase(), 'atk');
+  const pEvd = getPts(lv.toLowerCase(), 'evd');
+  const pDef = getPts(lv.toLowerCase(), 'def');
+  $('badgeAtk').textContent=`FIREPOWER · ${lv} +${pAtk}`;
+  $('badgeEvd').textContent=`EVASION · ${lv} +${pEvd}`;
+  $('badgeDef').textContent=`BARRIER · ${lv} +${pDef}`;
+  const currentPts = getPts(lv.toLowerCase(), currentMode);
   $('qlvl').className=lv.toLowerCase();
-  $('qlvl').textContent=`${lv} +${pts}`;
+  $('qlvl').textContent=`${lv} +${currentPts}`;
 }
 
 // ============================================================
@@ -862,13 +865,18 @@ $('btnDef').onclick=()=>setMode('def');
 // MODAL / QUESTIONS
 // ============================================================
 function getLevel(){return wave>=8?'hard':(wave>=4?'normal':'easy');}
-function getPts(lv){return lv==='hard'?5:(lv==='normal'?2:1);}
+function getPts(lv, mode) {
+  if (mode === 'atk') return lv === 'hard' ? 30 : (lv === 'normal' ? 20 : 13);
+  if (mode === 'evd') return lv === 'hard' ? 20 : (lv === 'normal' ? 14 : 8);
+  if (mode === 'def') return lv === 'hard' ? 15 : (lv === 'normal' ? 10 : 5);
+  return lv === 'hard' ? 5 : (lv === 'normal' ? 2 : 1);
+}
 
 function generateQuestion(){
   if(modalOpen)return;
   if(QB.length === 0) return; // Tunggu data siap
   modalOpen=true;total++;
-  const lv=getLevel();const pts=getPts(lv);
+  const lv=getLevel();const pts=getPts(lv, currentMode);
   const src=QB.filter(q=>q.t===currentMode&&q.l===lv);
   const fallback=QB.filter(q=>q.t===currentMode);
   const pool=src.length>0?src:fallback;
